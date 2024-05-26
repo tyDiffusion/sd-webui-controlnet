@@ -235,6 +235,8 @@ class ControlNetUnit(BaseModel):
         """This unit can accept multiple input images."""
         return self.module in (
             "ip-adapter-auto",
+            "ip-adapter_clip_g",
+            "ip-adapter_clip_h",
             "ip-adapter_clip_sdxl",
             "ip-adapter_clip_sdxl_plus_vith",
             "ip-adapter_clip_sd15",
