@@ -140,14 +140,16 @@ class PlugableIPAdapter(torch.nn.Module):
         self.dtype = dtype
 
         self.ipadapter.to(device, dtype=self.dtype)
-        if isinstance(preprocessor_outputs, (list, tuple)):
-            preprocessor_outputs = preprocessor_outputs
-        else:
-            preprocessor_outputs = [preprocessor_outputs]
-        self.image_emb = ImageEmbed.average_of(
-            *[self.ipadapter.get_image_emb(o) for o in preprocessor_outputs]
-        )
+        
+        if (isinstance(preprocessor_outputs, ImageEmbed)):
+            self.image_emb = preprocessor_outputs
+            
+        elif (isinstance(preprocessor_outputs, dict)):
+            self.image_emb = self.ipadapter.get_image_emb(preprocessor_outputs)            
 
+        elif (isinstance(preprocessor_outputs, tuple)):
+            self.image_emb = ImageEmbed.average_of(*[self.ipadapter.get_image_emb(o) for o in preprocessor_outputs])                
+          
         if self.ipadapter.is_sdxl:
             sd_version = StableDiffusionVersion.SDXL
             from sgm.modules.attention import CrossAttention
