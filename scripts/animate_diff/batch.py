@@ -3,6 +3,7 @@ from scripts.logging import logger
 from modules.processing import StableDiffusionProcessing
 from modules import shared
 
+import os
 
 def add_animate_diff_batch_input(
     p: StableDiffusionProcessing, unit: ControlNetUnit
@@ -10,6 +11,10 @@ def add_animate_diff_batch_input(
     """AnimateDiff + ControlNet batch processing."""
     assert unit.is_animate_diff_batch
 
+    if (not isinstance(unit.batch_images, str)):
+        unit.batch_images = list(unit.batch_images)[0]
+        unit.batch_images = os.path.dirname("".join(unit.batch_images))
+    
     batch_parameters = unit.batch_images.split("\n")
     batch_image_dir = batch_parameters[0]
     logger.info(
