@@ -955,7 +955,7 @@ class Script(scripts.Script, metaclass=(
                             c = model_net.ipadapter.get_image_emb(c) # noqa
                             ip_adapter_image_emb_cond.append(c.cond_emb)
                         c_cond = torch.cat(ip_adapter_image_emb_cond, dim=0)
-                        c = ImageEmbed(c_cond, c.uncond_emb, True)
+                        c = ImageEmbed(c_cond, c.uncond_emb)
                     else:
                         c = torch.cat(cc, dim=0)
                     # SparseCtrl keyframe need to encode control image with VAE
@@ -994,7 +994,7 @@ class Script(scripts.Script, metaclass=(
                             c_full = prompt_scheduler.multi_cond(c_full, prompt_closed_loop)
                             if shared.opts.batch_cond_uncond:
                                 c_full = torch.cat([c_full, c_full], dim=0)
-                            c = ImageEmbed(c_full, ip_adapter_emb.uncond_emb, True)
+                            c = ImageEmbed(c_full, ip_adapter_emb.uncond_emb)
                         else:
                             # normal CN should insert empty frames
                             logger.info(f"ControlNet: control images will be applied to frames: {cn_ad_keyframe_idx} where")
