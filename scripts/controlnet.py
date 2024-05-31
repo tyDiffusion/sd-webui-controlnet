@@ -9,7 +9,6 @@ import modules.scripts as scripts
 from modules import shared, devices, script_callbacks, processing, masking, images
 import gradio as gr
 import time
-import importlib
 
 from einops import rearrange
 
