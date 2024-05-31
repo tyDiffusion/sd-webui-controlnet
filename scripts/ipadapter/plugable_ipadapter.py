@@ -123,9 +123,11 @@ class PlugableIPAdapter(torch.nn.Module):
         pulid_attn_setting: Optional[PuLIDAttnSetting] = None,
         dtype=torch.float32,
     ):
+    
         global current_model
         current_model = model
 
+        
         self.p_start = start
         self.p_end = end
         self.latent_width = latent_width
@@ -141,6 +143,8 @@ class PlugableIPAdapter(torch.nn.Module):
 
         self.ipadapter.to(device, dtype=self.dtype)
         
+        
+        
         if (isinstance(preprocessor_outputs, ImageEmbed)):
             self.image_emb = preprocessor_outputs
             
@@ -148,8 +152,8 @@ class PlugableIPAdapter(torch.nn.Module):
             self.image_emb = self.ipadapter.get_image_emb(preprocessor_outputs)            
 
         elif (isinstance(preprocessor_outputs, tuple)):
-            self.image_emb = ImageEmbed.average_of(*[self.ipadapter.get_image_emb(o) for o in preprocessor_outputs])                
-          
+            self.image_emb = ImageEmbed.average_of(*[self.ipadapter.get_image_emb(o) for o in preprocessor_outputs])     
+
         if self.ipadapter.is_sdxl:
             sd_version = StableDiffusionVersion.SDXL
             from sgm.modules.attention import CrossAttention
@@ -175,12 +179,13 @@ class PlugableIPAdapter(torch.nn.Module):
             assert isinstance(self.weight, (float, int))
             return self.weight
 
-    def call_ip(self, key: str, feat, device):
-        if key in self.cache:
-            return self.cache[key]
-        else:
+    def call_ip(self, key: str, contextKey : str, feat, device):
+        
+        if contextKey in self.cache:            
+            return self.cache[contextKey]
+        else:                     
             ip = self.ipadapter.ip_layers.to_kvs[key](feat).to(device)
-            self.cache[key] = ip
+            self.cache[contextKey] = ip
             return ip
 
     def apply_effective_region_mask(self, out: torch.Tensor) -> torch.Tensor:
@@ -276,6 +281,7 @@ class PlugableIPAdapter(torch.nn.Module):
     def patch_forward(self, number: int, transformer_index: int):
         @torch.no_grad()
         def forward(attn_blk, x, q):
+        
             batch_size, sequence_length, inner_dim = x.shape
             h = attn_blk.heads
             head_dim = inner_dim // h
@@ -291,16 +297,24 @@ class PlugableIPAdapter(torch.nn.Module):
             ):
                 return 0.0
 
+            contextID = 0
+            if getattr(self, "contextID", None) is not None:                
+                contextID = self.contextID
+            
             k_key = f"{number * 2 + 1}_to_k_ip"
             v_key = f"{number * 2 + 1}_to_v_ip"
+            
+            context_k_key = f"{number * 2 + 1 + 9999 * contextID}_to_k_ip"
+            context_v_key = f"{number * 2 + 1 + 9999 * contextID}_to_v_ip"
+            
             ip_out = self.attn_eval(
                 hidden_states=x,
                 query=q,
                 cond_uncond_image_emb=self.image_emb.eval(current_model.cond_mark),
                 attn_heads=h,
                 head_dim=head_dim,
-                emb_to_k=lambda emb: self.call_ip(k_key, emb, device=q.device),
-                emb_to_v=lambda emb: self.call_ip(v_key, emb, device=q.device),
+                emb_to_k=lambda emb: self.call_ip(k_key, context_k_key, emb, device=q.device),
+                emb_to_v=lambda emb: self.call_ip(v_key, context_v_key, emb, device=q.device),
             )
             return self.apply_effective_region_mask(ip_out * weight)
 
