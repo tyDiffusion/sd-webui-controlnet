@@ -127,7 +127,7 @@ class IPAdapterModel(torch.nn.Module):
 
         self.image_proj_model.load_state_dict(state_dict["image_proj"])
         self.ip_layers = To_KV(state_dict["ip_adapter"])
-
+                
     def init_proj_faceid(self):
         if self.is_plus:
             image_proj_model = ProjModelFaceIdPlus(
