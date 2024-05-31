@@ -9,6 +9,7 @@ import modules.scripts as scripts
 from modules import shared, devices, script_callbacks, processing, masking, images
 import gradio as gr
 import time
+import importlib
 
 from einops import rearrange
 
@@ -941,13 +942,14 @@ class Script(scripts.Script, metaclass=(
                 controls, hr_controls, additional_maps = get_control(
                     p, unit, idx, control_model_type, preprocessor)
                 detected_maps.extend(additional_maps)
-
+                
             if len(controls) == len(hr_controls) == 1 and control_model_type not in [ControlModelType.SparseCtrl]:
                 control = controls[0]
                 hr_control = hr_controls[0]
             elif unit.is_animate_diff_batch or control_model_type in [ControlModelType.SparseCtrl]:
                 cn_ad_keyframe_idx = getattr(unit, "batch_keyframe_idx", None)
                 def ad_process_control(cc: List[torch.Tensor], cn_ad_keyframe_idx=cn_ad_keyframe_idx):
+                    
                     if unit.accepts_multiple_inputs:
                         ip_adapter_image_emb_cond = []
                         model_net.ipadapter.image_proj_model.to(torch.float32) # noqa
@@ -984,17 +986,25 @@ class Script(scripts.Script, metaclass=(
                             ip_adapter_emb = c
                             c = c.cond_emb
                             c_full = torch.zeros((p.batch_size, *c.shape[1:]), dtype=c.dtype, device=c.device)
-                            for i, idx in enumerate(cn_ad_keyframe_idx[:-1]):
-                                c_full[idx:cn_ad_keyframe_idx[i + 1]] = c[i]
+
+
+                            #this logic isnt working for prompt travel...result when batch size < video_length is just crazy latent noise...fill c_full with c, below
+                            #for i, idx in enumerate(cn_ad_keyframe_idx[:-1]):                                                                                 
+                            #    c_full[idx:cn_ad_keyframe_idx[i + 1]] = c[i]   
+
+                            for i in range(len(c)):
+                                c_full[i] = c[i]
+                                
                             c_full[cn_ad_keyframe_idx[-1]:] = c[-1]
                             ad_params = get_animatediff_arg(p)
                             prompt_scheduler = deepcopy(ad_params.prompt_scheduler)
                             prompt_scheduler.prompt_map = {i: "" for i in cn_ad_keyframe_idx}
-                            prompt_closed_loop = (ad_params.video_length > ad_params.batch_size) and (ad_params.closed_loop in ['R+P', 'A'])
+                            prompt_closed_loop = (ad_params.video_length > ad_params.batch_size) and (ad_params.closed_loop in ['R+P', 'A'])                            
+
                             c_full = prompt_scheduler.multi_cond(c_full, prompt_closed_loop)
                             if shared.opts.batch_cond_uncond:
                                 c_full = torch.cat([c_full, c_full], dim=0)
-                            c = ImageEmbed(c_full, ip_adapter_emb.uncond_emb)
+                            c = ImageEmbed(c_full, ip_adapter_emb.uncond_emb)                            
                         else:
                             # normal CN should insert empty frames
                             logger.info(f"ControlNet: control images will be applied to frames: {cn_ad_keyframe_idx} where")
@@ -1007,7 +1017,7 @@ class Script(scripts.Script, metaclass=(
                     if shared.opts.batch_cond_uncond and not unit.accepts_multiple_inputs:
                         c = torch.cat([c, c], dim=0)
                     return c
-
+                
                 control = ad_process_control(controls)
                 hr_control = ad_process_control(hr_controls) if hr_controls[0] is not None else None
                 if control_model_type == ControlModelType.SparseCtrl:
